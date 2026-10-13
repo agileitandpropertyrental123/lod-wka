@@ -1,0 +1,328 @@
+const express = require('express');
+const fs = require('fs');
+const path = require('path');
+const app = express();
+
+app.use(express.json());
+
+const DATA_FILE = path.join(__dirname, 'fridge.json');
+
+const readData = () => {
+    if (!fs.existsSync(DATA_FILE)) {
+        const initialData = [
+            { id: "1", name: "Jajka", amount: 10, unit: "szt." },
+            { id: "2", name: "Mleko", amount: 1, unit: "l" }
+        ];
+        fs.writeFileSync(DATA_FILE, JSON.stringify(initialData, null, 2), 'utf8');
+        return initialData;
+    }
+    const fileContent = fs.readFileSync(DATA_FILE, 'utf8');
+    return JSON.parse(fileContent);
+};
+
+const writeData = (data) => {
+    fs.writeFileSync(DATA_FILE, JSON.stringify(data, null, 2), 'utf8');
+};
+
+// --- NOWOCZESNY FRONTEND W STYLU INDIGO ---
+app.get('/', (req, res) => {
+    res.send(`
+        <!DOCTYPE html>
+        <html lang="pl">
+        <head>
+            <meta charset="UTF-8">
+            <meta name="viewport" content="width=device-width, initial-scale=1.0">
+            <title>Co mam w lodówce?</title>
+            <style>
+                :root {
+                    --primary: #4f46e5;
+                    --primary-hover: #4338ca;
+                    --bg-color: #f8fafc;
+                    --card-bg: #ffffff;
+                    --text-main: #1e293b;
+                    --text-muted: #64748b;
+                    --border-color: #e2e8f0;
+                    --danger: #ef4444;
+                }
+                body {
+                    font-family: 'Inter', system-ui, -apple-system, sans-serif;
+                    background-color: var(--bg-color);
+                    color: var(--text-main);
+                    max-width: 650px;
+                    margin: 40px auto;
+                    padding: 0 20px;
+                }
+                h1 {
+                    text-align: center;
+                    color: var(--primary);
+                    font-weight: 700;
+                    margin-bottom: 24px;
+                }
+                .card {
+                    background: var(--card-bg);
+                    padding: 24px;
+                    border-radius: 12px;
+                    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -2px rgba(0, 0, 0, 0.05);
+                    margin-bottom: 20px;
+                    border: 1px solid var(--border-color);
+                }
+                h3 {
+                    margin-top: 0;
+                    color: var(--text-main);
+                    font-size: 1.1rem;
+                    margin-bottom: 16px;
+                }
+                form {
+                    display: flex;
+                    gap: 12px;
+                    flex-wrap: wrap;
+                }
+                input, select, button {
+                    padding: 10px 14px;
+                    font-size: 15px;
+                    border: 1px solid var(--border-color);
+                    border-radius: 8px;
+                    outline: none;
+                    transition: border-color 0.2s, box-shadow 0.2s;
+                }
+                input:focus, select:focus {
+                    border-color: var(--primary);
+                    box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.15);
+                }
+                input[type="text"] { flex: 2; min-width: 150px; }
+                input[type="number"] { flex: 1; min-width: 80px; }
+                select { flex: 1; background: #fff; cursor: pointer; }
+                button[type="submit"] {
+                    background-color: var(--primary);
+                    color: white;
+                    border: none;
+                    cursor: pointer;
+                    flex: 1;
+                    font-weight: 600;
+                    transition: background-color 0.2s;
+                }
+                button[type="submit"]:hover {
+                    background-color: var(--primary-hover);
+                }
+                ul {
+                    list-style: none;
+                    padding: 0;
+                    margin: 0;
+                }
+                li {
+                    display: flex;
+                    justify-content: space-between;
+                    align-items: center;
+                    background: #f8fafc;
+                    padding: 12px 16px;
+                    border: 1px solid var(--border-color);
+                    border-radius: 8px;
+                    margin-bottom: 10px;
+                }
+                .item-text {
+                    font-weight: 500;
+                }
+                .item-badge {
+                    background: #e0e7ff;
+                    color: var(--primary);
+                    padding: 4px 8px;
+                    border-radius: 6px;
+                    font-weight: 600;
+                    font-size: 0.9rem;
+                    margin-left: 8px;
+                }
+                .delete-btn {
+                    background-color: transparent;
+                    color: var(--danger);
+                    border: 1px solid #fee2e2;
+                    padding: 6px 12px;
+                    border-radius: 6px;
+                    cursor: pointer;
+                    font-weight: 500;
+                    transition: background-color 0.2s, color 0.2s;
+                }
+                .delete-btn:hover {
+                    background-color: var(--danger);
+                    color: white;
+                }
+                .empty {
+                    text-align: center;
+                    color: var(--text-muted);
+                    padding: 20px 0;
+                }
+            </style>
+        </head>
+        <body>
+
+            <h1>🥗 Co mam w lodówce?</h1>
+
+            <div class="card">
+                <h3>Dodaj produkt</h3>
+                <form id="addForm">
+                    <input type="text" id="name" placeholder="Nazwa (np. Masło)" required>
+                    <input type="number" id="amount" placeholder="Ilość" step="any" min="0.1" required>
+                    <select id="unit">
+                        <option value="szt.">szt.</option>
+                        <option value="l">l</option>
+                        <option value="ml">ml</option>
+                        <option value="kg">kg</option>
+                        <option value="g">g</option>
+                        <option value="opak.">opak.</option>
+                    </select>
+                    <button type="submit">Dodaj</button>
+                </form>
+            </div>
+
+            <div class="card">
+                <h3>Zawartość lodówki</h3>
+                <ul id="fridgeList">
+                    <p class="empty">Ładowanie produktów...</p>
+                </ul>
+            </div>
+
+            <script>
+                const API_URL = '/api/fridge';
+                const fridgeList = document.getElementById('fridgeList');
+                const addForm = document.getElementById('addForm');
+
+                async function fetchFridge() {
+                    try {
+                        const response = await fetch(API_URL);
+                        const items = await response.json();
+                        
+                        if (items.length === 0) {
+                            fridgeList.innerHTML = '<p class="empty">Twoja lodówka jest pusta.</p>';
+                            return;
+                        }
+
+                        fridgeList.innerHTML = '';
+                        items.forEach(item => {
+                            const li = document.createElement('li');
+                            li.innerHTML = \`
+                                <div>
+                                    <span class="item-text">\${item.name}</span>
+                                    <span class="item-badge">\${item.amount} \${item.unit}</span>
+                                </div>
+                                <button class="delete-btn" onclick="deleteItem('\${item.id}')">Usuń</button>
+                            \`;
+                            fridgeList.appendChild(li);
+                        });
+                    } catch (error) {
+                        fridgeList.innerHTML = '<p class="empty" style="color: red;">Nie udało się połączyć z backendem!</p>';
+                    }
+                }
+
+                addForm.addEventListener('submit', async (e) => {
+                    e.preventDefault();
+                    
+                    const name = document.getElementById('name').value;
+                    const amount = document.getElementById('amount').value;
+                    const unit = document.getElementById('unit').value;
+
+                    try {
+                        const response = await fetch(API_URL, {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ name, amount: Number(amount), unit })
+                        });
+
+                        if (response.ok) {
+                            addForm.reset();
+                            fetchFridge();
+                        } else {
+                            alert('Błąd podczas dodawania produktu.');
+                        }
+                    } catch (error) {
+                        console.error('Błąd wysyłania:', error);
+                    }
+                });
+
+                async function deleteItem(id) {
+                    try {
+                        const response = await fetch(\`\${API_URL}/\${id}\`, {
+                            method: 'DELETE'
+                        });
+
+                        if (response.ok) {
+                            fetchFridge();
+                        } else {
+                            alert('Nie udało się usunąć produktu.');
+                        }
+                    } catch (error) {
+                        console.error('Błąd usuwania:', error);
+                    }
+                }
+
+                fetchFridge();
+            </script>
+        </body>
+        </html>
+    `);
+});
+
+// --- BACKEND API ---
+
+app.get('/api/fridge', (req, res) => {
+    try {
+        const fridgeItems = readData();
+        res.json(fridgeItems);
+    } catch (error) {
+        res.status(500).json({ error: 'Błąd podczas odczytu danych.' });
+    }
+});
+
+app.post('/api/fridge', (req, res) => {
+    const { name, amount, unit } = req.body;
+    
+    if (!name || amount === undefined) {
+        return res.status(400).json({ error: 'Nazwa oraz ilość są wymagane.' });
+    }
+
+    const parsedAmount = Number(amount);
+    if (isNaN(parsedAmount) || parsedAmount <= 0) {
+        return res.status(400).json({ error: 'Ilość musi być poprawną liczbą większą od zera.' });
+    }
+
+    const itemUnit = unit || 'szt.';
+    let fridgeItems = readData();
+
+    const existingItem = fridgeItems.find(
+        item => item.name.trim().toLowerCase() === name.trim().toLowerCase() && item.unit === itemUnit
+    );
+
+    if (existingItem) {
+        existingItem.amount += parsedAmount;
+        writeData(fridgeItems);
+        return res.status(200).json({ message: 'Zaktualizowano ilość.', item: existingItem });
+    } else {
+        const newItem = {
+            id: Date.now().toString(),
+            name: name.trim(),
+            amount: parsedAmount,
+            unit: itemUnit
+        };
+        fridgeItems.push(newItem);
+        writeData(fridgeItems);
+        return res.status(201).json({ message: 'Dodano nowy produkt.', item: newItem });
+    }
+});
+
+app.delete('/api/fridge/:id', (req, res) => {
+    const { id } = req.params;
+    let fridgeItems = readData();
+    const initialLength = fridgeItems.length;
+    
+    fridgeItems = fridgeItems.filter(i => i.id !== id);
+
+    if (fridgeItems.length === initialLength) {
+        return res.status(404).json({ error: 'Nie znaleziono produktu.' });
+    }
+
+    writeData(fridgeItems);
+    res.status(204).send();
+});
+
+const PORT = 3000;
+app.listen(PORT, () => {
+    console.log("Serwer działa!");
+});
